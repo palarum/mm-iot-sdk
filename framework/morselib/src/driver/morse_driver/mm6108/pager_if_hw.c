@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <strings.h>
 
 #include "mmutils.h"
 
