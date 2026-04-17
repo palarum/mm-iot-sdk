@@ -292,20 +292,24 @@ static int morse_pager_hw_page_write(struct morse_pager *pager,
 
     if (offset < 0)
     {
+        MMLOG_ERR("hwPgWr EINVAL\n");
         return -EINVAL;
     }
 
     if (num_bytes > page->size_bytes)
     {
+        MMLOG_ERR("hwPgWr EMSGSIZE\n");
         return -EMSGSIZE;
     }
 
     if (page->addr == 0)
     {
+        MMLOG_ERR("hwPgWr EFAULT\n");
         return -EFAULT;
     }
 
     ret = morse_trns_write_multi_byte(pager->driverd, page->addr + offset, buf, num_bytes);
+    if (ret) { MMLOG_ERR("hwPgWr %d\n", ret); }
     return ret;
 }
 

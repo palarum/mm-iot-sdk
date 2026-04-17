@@ -125,7 +125,7 @@ static void comms_op_check(struct driver_data *driverd, morse_error_t return_cod
         consecutive_comm_failures++;
         if (consecutive_comm_failures >= MAX_COMM_FAILURES)
         {
-            MMLOG_WRN("%d consecutive comm failures\n", consecutive_comm_failures);
+            MMLOG_ERR("%d consecutive comm failures\n", consecutive_comm_failures);
             morse_trns_set_irq_enabled(driverd, false);
             driver_health_demand_check(driverd);
             consecutive_comm_failures = 0;
@@ -411,7 +411,6 @@ exit:
     return result;
 }
 
-
 static void morse_spi_irq_main(void *arg)
 {
     struct driver_data *driverd = (struct driver_data *)arg;
@@ -437,10 +436,8 @@ void __attribute__((weak)) mmhal_wlan_clear_spi_irq(void)
 {
 }
 
-
 static void morse_spi_irq_handler(void)
 {
-
     mmhal_wlan_set_spi_irq_enabled(false);
     mmhal_wlan_clear_spi_irq();
     mmosal_semb_give_from_isr(spi_irq_semb);
@@ -527,7 +524,7 @@ morse_error_t morse_trns_write_multi_byte(struct driver_data *driverd,
 
     if (len == 0 || (len & 0x03) != 0)
     {
-        MMLOG_WRN("Invalid length %lu\n", len);
+        MMLOG_ERR("Invalid length %lu\n", len);
         result = MORSE_INVALID_ARGUMENT;
         goto exit;
     }
@@ -546,7 +543,7 @@ morse_error_t morse_trns_write_multi_byte(struct driver_data *driverd,
         result = morse_address_base_set(address, MORSE_CONFIG_ACCESS_4BYTE, function);
         if (result != MORSE_SUCCESS)
         {
-            MMLOG_WRN("Address base set failed\n");
+            MMLOG_ERR("Address base set failed\n");
             goto exit;
         }
 
@@ -563,6 +560,7 @@ morse_error_t morse_trns_write_multi_byte(struct driver_data *driverd,
         result = morse_cmd53_write(function, address, data, size);
         if (result != MORSE_SUCCESS)
         {
+            MMLOG_ERR("morse_cmd53_write failed\n");
             goto exit;
         }
 
