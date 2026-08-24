@@ -34,13 +34,14 @@
 #define BIT(x) (1u << (x))
 #endif
 
-#ifndef STRINGIFY
-
-#define _STRINGIFY(x) #x
-
-#define STRINGIFY(x) _STRINGIFY(x)
+#ifdef __ZEPHYR__
+  #include <zephyr/toolchain.h>
 #endif
 
+#ifndef STRINGIFY
+  #define _STRINGIFY(x) #x
+  #define STRINGIFY(x) _STRINGIFY(x)
+#endif
 
 #define QDBM_TO_DBM(gain) ((gain) >> 2)
 

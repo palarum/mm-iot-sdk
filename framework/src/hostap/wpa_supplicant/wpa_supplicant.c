@@ -4323,6 +4323,7 @@ static void wpas_update_fils_connect_params(struct wpa_supplicant *wpa_s)
 }
 #endif /* CONFIG_FILS && IEEE8021X_EAPOL */
 
+#ifndef MM_IOT
 
 static u8 wpa_ie_get_edmg_oper_chans(const u8 *edmg_ie)
 {
@@ -4405,7 +4406,6 @@ fail:
 	return result;
 }
 
-
 static struct ieee80211_edmg_config
 get_supported_edmg(struct wpa_supplicant *wpa_s,
 		   struct hostapd_freq_params *freq,
@@ -4433,6 +4433,8 @@ fail:
 	request_edmg.bw_config = 0;
 	return request_edmg;
 }
+
+#endif
 
 
 #ifdef CONFIG_MBO
@@ -4470,7 +4472,9 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 	struct wpa_ssid *ssid = cwork->ssid;
 	struct wpa_supplicant *wpa_s = work->wpa_s;
 	u8 *wpa_ie;
+#ifndef MM_IOT
 	const u8 *edmg_ie_oper;
+#endif	
 	int use_crypt, ret, bssid_changed;
 	unsigned int cipher_pairwise, cipher_group, cipher_group_mgmt;
 	struct wpa_driver_associate_params params;

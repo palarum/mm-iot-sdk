@@ -510,6 +510,7 @@ static int wpas_op_class_supported(struct wpa_supplicant *wpa_s,
 #endif /* MM_IOT */
 }
 
+#if defined(CONFIG_IEEE80211AH) && !defined(MM_IOT)
 
 static int wpas_sta_secondary_channel_offset(struct wpa_bss *bss, u8 *current,
 					     u8 *channel)
@@ -527,7 +528,6 @@ static int wpas_sta_secondary_channel_offset(struct wpa_bss *bss, u8 *current,
 				    channel, &phy_type);
 }
 
-#if defined(CONFIG_IEEE80211AH) && !defined(MM_IOT)
 size_t wpas_supp_s1g_op_class_ie(struct wpa_supplicant *wpa_s,
 						struct wpa_ssid *ssid,
 						struct wpa_bss *bss, u8 *pos, size_t len)

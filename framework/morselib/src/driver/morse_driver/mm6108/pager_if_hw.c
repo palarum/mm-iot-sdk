@@ -15,6 +15,7 @@
 #include "driver/morse_driver/chip_if.h"
 #include "driver/transport/morse_transport.h"
 
+#include <zephyr/arch/common/ffs.h>
 
 #define ENABLE_PAGER_HW_IRQ 1
 
@@ -126,7 +127,7 @@ static int morse_pager_hw_get_page_from_cache(struct morse_pager *pager, struct 
     {
         return -ENOENT;
     }
-    index = ffs(aux_data->cache.bitmap[block]);
+    index = find_lsb_set(aux_data->cache.bitmap[block]);
     MMLOG_VRB("CACHE idx %d\n", index);
     if (!index)
     {

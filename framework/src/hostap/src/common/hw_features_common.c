@@ -477,9 +477,6 @@ int hostapd_set_freq_params(struct hostapd_freq_params *data,
 			    struct eht_capabilities *eht_cap,
 			    u16 punct_bitmap)
 {
-	enum oper_chan_width oper_chwidth_legacy;
-	u8 seg0_legacy, seg1_legacy;
-
 	if (!he_cap || !he_cap->he_supported)
 		he_enabled = 0;
 	if (!eht_cap || !eht_cap->eht_supported)
@@ -519,6 +516,9 @@ int hostapd_set_freq_params(struct hostapd_freq_params *data,
 
 
 #ifndef MM_IOT
+	enum oper_chan_width oper_chwidth_legacy;
+	u8 seg0_legacy, seg1_legacy;
+
 	hostapd_encode_edmg_chan(enable_edmg, edmg_channel, channel,
 				 &data->edmg);
 
