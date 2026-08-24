@@ -443,6 +443,7 @@ void wnm_btm_reset(struct wpa_supplicant *wpa_s)
 #endif /* CONFIG_MBO */
 }
 
+#ifndef CONFIG_NO_BSS_TRANS_MGMT
 
 static void wnm_parse_neighbor_report_multi_link(struct neighbor_report *rep,
 						 u8 id, u8 elen, const u8 *pos)
@@ -929,8 +930,6 @@ static int wnm_nei_rep_add_bss(struct wpa_supplicant *wpa_s,
 			       pref);
 }
 
-
-#ifndef CONFIG_NO_BSS_TRANS_MGMT
 static void wnm_add_cand_list(struct wpa_supplicant *wpa_s, struct wpabuf **buf)
 {
 	unsigned int i, pref = 255;
