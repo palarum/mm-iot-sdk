@@ -331,7 +331,7 @@ static int morse_cmd53_put_data(const struct mmhal_wlan_sdio_cmd53_write_args *a
         uint8_t rcv_data;
 
 
-        MMOSAL_TASK_ENTER_CRITICAL();
+// !!!        MMOSAL_TASK_ENTER_CRITICAL();
 
         for (attempt = 0; attempt < 4; attempt++)
         {
@@ -341,7 +341,7 @@ static int morse_cmd53_put_data(const struct mmhal_wlan_sdio_cmd53_write_args *a
                 break;
             }
         }
-        MMOSAL_TASK_EXIT_CRITICAL();
+// !!!        MMOSAL_TASK_EXIT_CRITICAL();
 
         CMD53_WRITE_FSM_TRACE("chk_rsp");
         ret = morse_test_data_rsp_token(rcv_data);
