@@ -238,7 +238,7 @@ enum mmwlan_status mmdrv_init(struct mmdrv_chip_info *chip_info, const char *cou
     status = errno_to_status(morse_trns_start(&driver_data));
     if (status != MMWLAN_SUCCESS)
     {
-        MMLOG_ERR("Transport init failed\n");
+        MMLOG_ERR("Transport init failed: %d\n", result);
         goto error_transport;
     }
 
