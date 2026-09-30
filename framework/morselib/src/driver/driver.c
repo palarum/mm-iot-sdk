@@ -226,7 +226,7 @@ int mmdrv_init(struct mmdrv_chip_info *chip_info, const char *country_code)
     result = morse_trns_start(&driver_data);
     if (result != MORSE_SUCCESS)
     {
-        MMLOG_ERR("Transport init failed\n");
+        MMLOG_ERR("Transport init failed: %d\n", result);
         goto error_transport;
     }
 

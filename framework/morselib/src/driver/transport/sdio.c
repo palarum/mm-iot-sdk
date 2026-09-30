@@ -696,6 +696,7 @@ static morse_error_t morse_trns_reset(struct driver_data *driverd)
     if (ret != 0)
     {
         MMLOG_WRN("Initial communication with chip failed\n");
+        morse_trns_release(driverd);
         return MORSE_FAILED;
     }
 
@@ -729,16 +730,18 @@ static morse_error_t morse_trns_reset(struct driver_data *driverd)
 
     morse_trns_release(driverd);
 
-    if (morse_hw_is_valid_chip_id(driverd->chip_id, driverd->cfg->valid_chip_ids))
+    if (morse_hw_is_valid_chip_id(driverd->chip_id,
+                                  driverd->cfg->valid_chip_ids))
     {
-        MMLOG_INF("Morse Chip Reset Successful\n");
+        MMLOG_INF("Morse Chip Reset Successful: chip_id=0x%08lx\n", driverd->chip_id);
         result = MORSE_SUCCESS;
     }
-    else
+    else 
     {
-        MMLOG_ERR("Morse Chip Reset Unsuccessful\n");
+        MMLOG_ERR("Morse Chip Reset Unsuccessful: result=%d chip_id=0x%08lx\n", result, driverd->chip_id);
         result = MORSE_FAILED;
     }
+
     return result;
 }
 
@@ -785,6 +788,7 @@ morse_error_t morse_trns_start(struct driver_data *driverd)
     result = morse_trns_reset(driverd);
     if (result != MORSE_SUCCESS)
     {
+        MMLOG_ERR("TRNS START: reset failed: %d\n", result);
         goto exit;
     }
 
@@ -800,6 +804,7 @@ morse_error_t morse_trns_start(struct driver_data *driverd)
     if (spi_irq_task_handle == NULL)
     {
         result = MORSE_FAILED;
+        MMLOG_ERR("TRNS START: mmosal_task_create failed");
         goto exit;
     }
 
@@ -809,12 +814,14 @@ morse_error_t morse_trns_start(struct driver_data *driverd)
                                MMHAL_SDIO_FUNCTION_0);
     if (result != MORSE_SUCCESS)
     {
+        MMLOG_ERR("TRNS START: IEN write failed: %d\n", result);
         goto exit;
     }
 
     result = morse_cmd52_read(SDIO_CCCR_BIC_ADDR, &bic, MMHAL_SDIO_FUNCTION_0);
     if (result != MORSE_SUCCESS)
     {
+        MMLOG_ERR("TRNS START: BIC read failed: %d\n", result);
         goto exit;
     }
 
@@ -823,6 +830,7 @@ morse_error_t morse_trns_start(struct driver_data *driverd)
     result = morse_cmd52_write(SDIO_CCCR_BIC_ADDR, bic, MMHAL_SDIO_FUNCTION_0);
     if (result != MORSE_SUCCESS)
     {
+        MMLOG_ERR("TRNS START: BIC write failed: %d\n", result);
         goto exit;
     }
 
