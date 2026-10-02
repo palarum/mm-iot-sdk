@@ -428,8 +428,7 @@ MM_WEAK int mmhal_wlan_sdio_cmd(uint8_t cmd_idx, uint32_t arg, uint32_t *rsp)
     SDIO_CMD_FSM_TRACE("Check Resp");
     if (response.status != 0x00)
     {
-
-        MMLOG_DBG("CMD%u: invalid ack (0x%02x)\n", cmd_idx, response.status);
+        MMLOG_WRN("CMD%u: invalid ack status=0x%02x data=0x%02x\n", cmd_idx, response.status, response.data);
         ret = MMHAL_SDIO_OTHER_ERROR;
     }
     else
@@ -459,8 +458,8 @@ exit:
 MM_WEAK int mmhal_wlan_sdio_startup(void)
 {
     uint32_t ii, ret;
-    mmhal_wlan_send_training_seq();
 
+    mmhal_wlan_send_training_seq();
 
     for (ii = 0; ii < STARTUP_MAX_ATTEMPTS; ii++)
     {
@@ -469,6 +468,7 @@ MM_WEAK int mmhal_wlan_sdio_startup(void)
         {
             break;
         }
+
         (void)mmhal_wlan_sdio_cmd(SDIO_CMD0, 0, NULL);
     }
 

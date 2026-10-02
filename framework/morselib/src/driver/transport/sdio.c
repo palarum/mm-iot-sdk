@@ -679,66 +679,104 @@ static morse_error_t morse_trns_reset(struct driver_data *driverd)
 
     morse_trns_claim(driverd);
 
+    /*
+     * Exactly one physical MM8108 reset per transport initialization.
+     */
+    MMLOG_INF("TRNS RESET: hardware reset begin\n");
     mmhal_wlan_hard_reset();
+    MMLOG_INF("TRNS RESET: hardware reset complete\n");
 
     bool xtal_init_required = mmhal_wlan_ext_xtal_init_is_required();
 
     if (xtal_init_required)
     {
-        xtal_init_sdio_trans_delay_ms = driverd->cfg->xtal_init_sdio_trans_delay_ms;
+        xtal_init_sdio_trans_delay_ms =
+            driverd->cfg->xtal_init_sdio_trans_delay_ms;
+
+        MMLOG_INF("TRNS RESET: XTAL init required, delay=%u\n",
+                  xtal_init_sdio_trans_delay_ms);
+
         mmosal_task_sleep(50);
     }
 
-
     morse_address_base_clear_cache();
 
+    MMLOG_INF("TRNS RESET: calling sdio_startup\n");
+
     ret = mmhal_wlan_sdio_startup();
+
+    MMLOG_INF("TRNS RESET: sdio_startup returned %d\n", ret);
+
     if (ret != 0)
     {
-        MMLOG_WRN("Initial communication with chip failed\n");
+        MMLOG_ERR("TRNS RESET: sdio_startup FAILED ret=%d\n", ret);
+
         morse_trns_release(driverd);
         return MORSE_FAILED;
     }
+
+    MMLOG_INF("TRNS RESET: sdio_startup OK\n");
 
     MMOSAL_ASSERT(driverd->cfg != NULL);
     MMOSAL_ASSERT(driverd->cfg->regs != NULL);
 
     if (driverd->cfg->regs->clk_ctrl_address != 0)
     {
-        morse_trns_write_le32(driverd,
-                              driverd->cfg->regs->clk_ctrl_address,
-                              driverd->cfg->regs->clk_ctrl_value);
+        morse_trns_write_le32(
+            driverd,
+            driverd->cfg->regs->clk_ctrl_address,
+            driverd->cfg->regs->clk_ctrl_value);
     }
 
     if (driverd->cfg->xtal_init && xtal_init_required)
     {
-
         driverd->cfg->xtal_init(driverd);
         xtal_init_sdio_trans_delay_ms = 0;
     }
 
+    /*
+     * Leave the original chip-ID retries alone for now.
+     */
     for (i = 0; i < MAX_RETRY; i++)
     {
+        result = morse_trns_read_le32(
+            driverd,
+            driverd->cfg->regs->chip_id_address,
+            &driverd->chip_id);
 
-        result =
-            morse_trns_read_le32(driverd, driverd->cfg->regs->chip_id_address, &driverd->chip_id);
         if (result == MORSE_SUCCESS)
         {
+            MMLOG_INF(
+                "TRNS RESET: chip ID read OK try=%d id=0x%08lx\n",
+                i + 1,
+                (unsigned long)driverd->chip_id);
             break;
         }
+
+        MMLOG_ERR(
+            "TRNS RESET: chip ID read FAILED try=%d result=%d\n",
+            i + 1,
+            result);
     }
 
     morse_trns_release(driverd);
 
-    if (morse_hw_is_valid_chip_id(driverd->chip_id,
-                                  driverd->cfg->valid_chip_ids))
+    if (morse_hw_is_valid_chip_id(
+            driverd->chip_id,
+            driverd->cfg->valid_chip_ids))
     {
-        MMLOG_INF("Morse Chip Reset Successful: chip_id=0x%08lx\n", driverd->chip_id);
+        MMLOG_INF("TRNS RESET: valid chip ID 0x%08lx\n",
+                  (unsigned long)driverd->chip_id);
+
         result = MORSE_SUCCESS;
     }
-    else 
+    else
     {
-        MMLOG_ERR("Morse Chip Reset Unsuccessful: result=%d chip_id=0x%08lx\n", result, driverd->chip_id);
+        MMLOG_ERR(
+            "TRNS RESET: INVALID chip ID 0x%08lx read_result=%d\n",
+            (unsigned long)driverd->chip_id,
+            result);
+
         result = MORSE_FAILED;
     }
 
