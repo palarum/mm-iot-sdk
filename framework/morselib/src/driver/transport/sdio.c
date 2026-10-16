@@ -10,6 +10,13 @@
 #include "mmosal.h"
 #include "mmhal_wlan.h"
 
+volatile uint32_t dbg_irq_loop_count = 0;
+volatile uint32_t dbg_irq_bus_claimed_count = 0;
+volatile uint32_t dbg_irq_hw_call_count = 0;
+volatile uint32_t dbg_irq_hw_return_count = 0;
+
+extern void morse_debug_led_red_on(void);
+extern void morse_debug_led_green_on(void);
 
 #define SPI_IRQ_TASK_PRIORITY (MMOSAL_TASK_PRI_HIGH)
 #define SPI_IRQ_TASK_STACK    (768)
@@ -410,7 +417,7 @@ exit:
     return result;
 }
 
-
+/*
 static void morse_spi_irq_main(void *arg)
 {
     struct driver_data *driverd = (struct driver_data *)arg;
@@ -430,7 +437,37 @@ static void morse_spi_irq_main(void *arg)
 
     spi_irq_task_has_finished = true;
 }
+*/
+static void morse_spi_irq_main(void *arg)
+{
+    struct driver_data *driverd = (struct driver_data *)arg;
 
+    while (spi_irq_task_run)
+    {
+        (void)mmosal_semb_wait(
+            spi_irq_semb,
+            mmhal_spi_irq_poll_interval);
+
+        dbg_irq_loop_count++;
+
+        morse_trns_claim(driverd);
+
+        dbg_irq_bus_claimed_count++;
+
+        if (morse_trns_spi_irq_enabled)
+        {
+            dbg_irq_hw_call_count++;
+
+            morse_hw_irq_handle(driverd);
+
+            dbg_irq_hw_return_count++;
+        }
+
+        morse_trns_release(driverd);
+    }
+
+    spi_irq_task_has_finished = true;
+}
 
 void __attribute__((weak)) mmhal_wlan_clear_spi_irq(void)
 {
@@ -553,6 +590,7 @@ morse_error_t morse_trns_write_multi_byte(struct driver_data *driverd,
         result = morse_address_base_set(address, MORSE_CONFIG_ACCESS_4BYTE, function);
         if (result != MORSE_SUCCESS)
         {
+            morse_debug_led_red_on();
             MMLOG_WRN("Address base set failed\n");
             goto exit;
         }

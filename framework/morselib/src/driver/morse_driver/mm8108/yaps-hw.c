@@ -21,7 +21,6 @@
 #include "driver/morse_driver/morse.h"
 #include "driver/transport/morse_transport.h"
 
-
 #define YAPS_MAX_RX_PAYLOAD 1628
 #define YAPS_MAX_TX_PAYLOAD 1514
 #define TX_DATA_HEADER_LEN                  \
@@ -420,8 +419,6 @@ int morse_yaps_hw_write_pkt(struct morse_yaps *yaps,
                                       yaps->aux_data->yds_addr,
                                       mmpkt_get_data_start(view),
                                       mmpkt_get_data_length(view));
-
-
     mmpkt_remove_from_start(view, sizeof(delim));
     mmpkt_close(&view);
 
@@ -588,12 +585,20 @@ int morse_yaps_hw_update_status(struct morse_yaps *yaps)
 
     reg_read_timeout = mmosal_get_time_ms() + YAPS_STATUS_REG_READ_TIMEOUT_MS;
     do {
+/*
         if (mmosal_time_has_passed(reg_read_timeout))
         {
             MMLOG_ERR("Timed out reading status registers: %d\n", ret);
             ret = -ETIMEDOUT;
             break;
         }
+*/
+        if (mmosal_time_has_passed(reg_read_timeout))
+        {
+            MMLOG_ERR("Timed out reading status registers: %d\n", ret);
+            ret = -ETIMEDOUT;
+            break;
+        }            
         ret = morse_trns_read_multi_byte(yaps->driverd,
                                          yaps->aux_data->status_regs_addr,
                                          (uint8_t *)status_regs,
