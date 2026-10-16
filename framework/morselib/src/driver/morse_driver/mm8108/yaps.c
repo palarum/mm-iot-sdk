@@ -35,6 +35,11 @@
 #define MAX_PKTS_PER_RX_TXN 32
 #endif
 
+volatile int dbg_yaps_status_error = 0;
+volatile int dbg_yaps_write_error = 0;
+volatile int dbg_yaps_full_error = 0;
+
+extern void morse_debug_led_blue_on(void);
 
 static struct morse_skbq *skbq_yaps_tc_q_from_aci(struct driver_data *driverd, int aci)
 {
@@ -263,6 +268,7 @@ static int morse_yaps_tx(struct morse_yaps *yaps, struct morse_skbq *mq)
     ret = yaps->ops->update_status(yaps);
     if (ret)
     {
+        dbg_yaps_status_error = ret;
         morse_hw_pager_update_consec_failure_cnt(yaps->driverd, ret);
         return ret;
     }
@@ -295,6 +301,10 @@ static int morse_yaps_tx(struct morse_yaps *yaps, struct morse_skbq *mq)
     MMPKT_LIST_WALK(&skbq_to_send, pfirst, pnext)
     {
         ret = yaps->ops->write_pkt(yaps, pfirst, tc_queue, pnext);
+        if (ret) 
+        {
+            dbg_yaps_write_error = ret;
+        }
         morse_hw_pager_update_consec_failure_cnt(yaps->driverd, ret);
 
         if (ret == 0)
@@ -346,7 +356,16 @@ static bool morse_yaps_tx_data_handler(struct morse_yaps *yaps)
             break;
         }
 
-        yaps->chip_queue_full.is_full = morse_yaps_tx(yaps, data_q);
+        //yaps->chip_queue_full.is_full = morse_yaps_tx(yaps, data_q);
+        int ret = morse_yaps_tx(yaps, data_q);
+        yaps->chip_queue_full.is_full = (ret != 0);
+
+        if (ret)
+        {
+            dbg_yaps_full_error = ret;
+            morse_debug_led_blue_on();
+        }
+
         count += morse_skbq_count(data_q);
 
         if (yaps->chip_queue_full.is_full)
@@ -533,7 +552,7 @@ void morse_yaps_work(struct driver_data *driverd)
         morse_skbq_data_traffic_resume(driverd);
     }
 
-
+/*
     if (driver_task_notification_check_and_clear(driverd, DRV_EVT_TX_PACKET_FREED_UP_PEND))
     {
         yaps->chip_queue_full.is_full = false;
@@ -544,7 +563,27 @@ void morse_yaps_work(struct driver_data *driverd)
     {
         goto exit;
     }
-
+*/
+    if (driver_task_notification_check_and_clear(
+            driverd, DRV_EVT_TX_PACKET_FREED_UP_PEND))
+    {
+        yaps->chip_queue_full.is_full = false;
+    
+        // Resume TX processing now that chip queue space
+        // is available.
+        driver_task_notify_event(driverd, DRV_EVT_TX_DATA_PEND);
+    }
+    
+    if (yaps->chip_queue_full.is_full)
+    {
+        // The MM8108 cannot accept another packet.
+        // Do not leave TX_DATA_PEND set, otherwise
+        // driver_task_main() can spin indefinitely.
+        (void)driver_task_notification_check_and_clear(
+            driverd, DRV_EVT_TX_DATA_PEND);
+    
+        goto exit;
+    }
 
     if (driver_task_notification_check_and_clear(driverd, DRV_EVT_TX_DATA_PEND))
     {

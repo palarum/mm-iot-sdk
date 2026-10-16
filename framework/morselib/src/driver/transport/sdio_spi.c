@@ -8,6 +8,7 @@
 #include "mmutils.h"
 #include "driver/morse_crc/morse_crc.h"
 
+extern void morse_debug_led_green_on(void);
 
 #ifdef ENABLE_SDIO_CMD_FSM_TRACE
 #include "mmtrace.h"
@@ -428,6 +429,10 @@ MM_WEAK int mmhal_wlan_sdio_cmd(uint8_t cmd_idx, uint32_t arg, uint32_t *rsp)
     SDIO_CMD_FSM_TRACE("Check Resp");
     if (response.status != 0x00)
     {
+        if (cmd_idx == SDIO_CMD52)
+        {
+            morse_debug_led_green_on();
+        }        
         MMLOG_WRN("CMD%u: invalid ack status=0x%02x data=0x%02x\n", cmd_idx, response.status, response.data);
         ret = MMHAL_SDIO_OTHER_ERROR;
     }
