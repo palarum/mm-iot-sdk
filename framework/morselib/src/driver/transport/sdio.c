@@ -703,6 +703,7 @@ static morse_error_t morse_trns_reset(struct driver_data *driverd)
     if (ret != 0)
     {
         MMLOG_WRN("Initial communication with chip failed\n");
+        morse_trns_release(driverd);
         return MORSE_FAILED;
     }
 
