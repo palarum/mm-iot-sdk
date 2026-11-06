@@ -79,6 +79,10 @@ static void hw_restart_evt_handler(struct umac_data *umacd, const struct umac_ev
         if (country_code == NULL)
         {
             MMLOG_ERR("Channel list not set\n");
+            /* CME 2026-11-05: still report completion, which clears the HW_RESTART TX
+             * pause. Returning here left all TX paused forever (and with no TX there are no
+             * SPI errors, so the wlan_hal.c recovery never notices). */
+            mmdrv_hw_restart_completed();
             return;
         }
 

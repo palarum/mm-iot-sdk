@@ -116,6 +116,10 @@ int morse_cmd_tx(struct driver_data *driverd,
         MMOSAL_DEV_ASSERT(driverd->cmd.rspview == NULL);
 
         MMOSAL_MUTEX_GET_INF(driverd->cmd.lock);
+        /* CME 2026-11-05: drop a response signal left by a command that already timed out,
+         * so this wait is for this command's response (was: an immediate false timeout and
+         * a duplicate send). */
+        (void)mmosal_semb_wait(driverd->cmd.semb, 0);
         timeout = timeout ? timeout : MM_CMD_TIMEOUT_DEFAULT;
         ret = morse_skbq_mmpkt_tx(cmd_q, mmpkt, MORSE_SKB_CHAN_COMMAND);
         if (ret == 0)
@@ -317,11 +321,14 @@ exit:
     mmpkt_close(&view);
     mmpkt_release(mmpkt);
 
-    MMOSAL_MUTEX_RELEASE(driverd->cmd.lock);
+    /* CME 2026-11-05: signal while still holding cmd.lock, together with setting rspview.
+     * Was given after the release: a waiter timing out in that gap took rspview, and the
+     * late give then woke the NEXT command's wait with no response for it. */
     if (notify)
     {
         mmosal_semb_give(driverd->cmd.semb);
     }
+    MMOSAL_MUTEX_RELEASE(driverd->cmd.lock);
 
     return ret;
 }

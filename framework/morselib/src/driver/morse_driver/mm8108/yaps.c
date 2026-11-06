@@ -31,6 +31,28 @@
 #endif
 
 
+/* CME 2026-11-05: after a failed RX read, retry after this long instead of re-posting
+ * RX_PEND at once. With the chip not answering (SPI errors, chip reset) the immediate
+ * re-post kept the priority-0 drv task looping and starved every lower-priority thread,
+ * including morselib's own health check. */
+#define YAPS_RX_ERROR_BACKOFF_MS 10
+static bool yaps_rx_read_failed;
+
+/* CME 2026-11-05: chip TX queue full handling. is_full used to be set from ANY TX error
+ * (SPI timeout, -EIO, ...), but only the chip's TX_PACKET_FREED_UP interrupt clears it, and
+ * that only comes when the chip really was full. Meanwhile morse_yaps_work left
+ * DRV_EVT_TX_DATA_PEND set, so the priority-0 drv task looped without sleeping, starving
+ * the spi_irq task (same priority, no timeslicing) that would deliver FREED_UP: a livelock,
+ * and data TX stopped for good. Now:
+ *  - only -ENOMEM from write_pkt ("will not fit", the chip asked to signal FREED_UP) is full;
+ *    other errors just retry via the normal 2 ms reschedule;
+ *  - while full, TX_DATA_PEND is rescheduled YAPS_TX_FULL_RETRY_MS later instead of left set;
+ *  - if FREED_UP hasn't come after YAPS_TX_FULL_RECHECK_MS, recheck the chip's queue space
+ *    (a lost interrupt would otherwise stop TX forever). */
+#define YAPS_TX_FULL_RETRY_MS   10
+#define YAPS_TX_FULL_RECHECK_MS 100
+static uint32_t yaps_tx_full_since_ms;
+
 #ifndef MAX_PKTS_PER_RX_TXN
 #define MAX_PKTS_PER_RX_TXN 32
 #endif
@@ -131,6 +153,7 @@ static bool yaps_read_pkt(struct morse_yaps *yaps)
     if (ret)
     {
         more_packets = true;
+        yaps_rx_read_failed = true;   /* CME: morse_yaps_work backs off before retrying */
         goto exit_return_page;
     }
 
@@ -346,12 +369,19 @@ static bool morse_yaps_tx_data_handler(struct morse_yaps *yaps)
             break;
         }
 
-        yaps->chip_queue_full.is_full = morse_yaps_tx(yaps, data_q);
+        int tx_ret = morse_yaps_tx(yaps, data_q);
         count += morse_skbq_count(data_q);
 
+        /* CME 2026-11-05: only "no room on the chip" waits for FREED_UP (see above) */
+        yaps->chip_queue_full.is_full = (tx_ret == -ENOMEM);
         if (yaps->chip_queue_full.is_full)
         {
-            break;
+            yaps_tx_full_since_ms = mmosal_get_time_ms();
+        }
+
+        if (tx_ret != 0)
+        {
+            break;   /* full or a transfer error: the caller reschedules TX in 2 ms */
         }
 
         if (aci == MORSE_ACI_BE)
@@ -398,7 +428,7 @@ static bool morse_yaps_rx_handler(struct morse_yaps *yaps)
     do {
         more_packets = yaps_read_pkt(yaps);
         count++;
-    } while ((count < MAX_PKTS_PER_RX_TXN) && (more_packets));
+    } while ((count < MAX_PKTS_PER_RX_TXN) && (more_packets) && !yaps_rx_read_failed);
 
     return more_packets;
 }
@@ -469,9 +499,18 @@ void morse_yaps_work(struct driver_data *driverd)
     {
         uint32_t buffered = yaps->data_rx_q.skbq.len;
 
+        yaps_rx_read_failed = false;
         if (morse_yaps_rx_handler(yaps))
         {
-            driver_task_notify_event(driverd, DRV_EVT_RX_PEND);
+            if (yaps_rx_read_failed)
+            {
+                /* CME 2026-11-05: the read failed - retry shortly, don't spin */
+                driver_task_schedule_notification(driverd, DRV_EVT_RX_PEND, YAPS_RX_ERROR_BACKOFF_MS);
+            }
+            else
+            {
+                driver_task_notify_event(driverd, DRV_EVT_RX_PEND);
+            }
         }
 
         if (yaps->data_rx_q.skbq.len > buffered)
@@ -537,11 +576,27 @@ void morse_yaps_work(struct driver_data *driverd)
     if (driver_task_notification_check_and_clear(driverd, DRV_EVT_TX_PACKET_FREED_UP_PEND))
     {
         yaps->chip_queue_full.is_full = false;
+        /* CME 2026-11-05: resume data TX now (TX_DATA_PEND may be parked on a timer below) */
+        driver_task_notify_event(driverd, DRV_EVT_TX_DATA_PEND);
     }
 
+    /* CME 2026-11-05: FREED_UP lost? Recheck the chip's queue space rather than wait forever */
+    if (yaps->chip_queue_full.is_full &&
+        mmosal_time_has_passed(yaps_tx_full_since_ms + YAPS_TX_FULL_RECHECK_MS))
+    {
+        MMLOG_WRN("No TX freed-up signal for %d ms - rechecking chip queue space\n",
+                  YAPS_TX_FULL_RECHECK_MS);
+        yaps->chip_queue_full.is_full = false;
+    }
 
     if (yaps->chip_queue_full.is_full)
     {
+        /* CME 2026-11-05: park TX_DATA_PEND on a timer instead of leaving it set (the drv
+         * task loops while any event is pending, so leaving it set was a busy loop) */
+        if (driver_task_notification_check_and_clear(driverd, DRV_EVT_TX_DATA_PEND))
+        {
+            driver_task_schedule_notification(driverd, DRV_EVT_TX_DATA_PEND, YAPS_TX_FULL_RETRY_MS);
+        }
         goto exit;
     }
 

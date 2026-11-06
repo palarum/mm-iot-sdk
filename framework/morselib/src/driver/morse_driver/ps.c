@@ -89,12 +89,19 @@ static void morse_ps_wakeup(struct driver_data *driverd)
 
     PS_TRACE_STATE("wakeup");
     MMLOG_DBG("Wakeup Pin Set\n");
+    /* CME 2026-11-05: drop a BUSY edge left over from an earlier wake (one that arrived
+     * after that wait had timed out), so this wait really waits for the chip. */
+    (void)mmosal_semb_wait(driverd->ps.wake, 0);
     atomic_store(&driverd->ps.pending_wake, true);
     mmhal_wlan_wake_assert();
     morse_ps_wait_after_wake_pin_raise(driverd);
+    /* CME 2026-11-05: stop treating BUSY edges as "wake done" as soon as the wait is over.
+     * Was cleared after the IRQ re-enable below, whose SPI traffic toggles BUSY: those
+     * edges gave ps.wake, and the next wakeup then returned at once and talked to a chip
+     * that was still booting (an SPI error burst). */
+    atomic_store(&driverd->ps.pending_wake, false);
     morse_trns_set_irq_enabled(driverd, true);
     driverd->ps.suspended = false;
-    atomic_store(&driverd->ps.pending_wake, false);
 
 
     morse_ps_update_timeout(driverd, DEFAULT_BUS_TIMEOUT_MS);

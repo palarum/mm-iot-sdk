@@ -522,7 +522,11 @@ int morse_skbq_tx_complete(struct morse_skbq *mq, struct mmpkt_list *skbq)
     spin_unlock(&mq->lock);
 
     mmosal_task_enter_critical();
-    if (mq->driverd->stale_status.enabled)
+    /* CME 2026-11-05: only start the stale-TX sweep timer if it isn't already running. It is
+     * one-shot (15 s) and was restarted on every send, so with any traffic more often than
+     * every 15 s it never fired: packets whose TX status the chip never sent were never
+     * swept, and the TX pool slowly ran out (TX then paused for good). */
+    if (mq->driverd->stale_status.enabled && !mmosal_is_timer_active(mq->driverd->stale_status.timer))
     {
         mmosal_timer_start(mq->driverd->stale_status.timer);
     }

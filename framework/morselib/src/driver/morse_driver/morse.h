@@ -105,7 +105,10 @@ enum morse_state_flags
     MORSE_STATE_FLAG_DATA_TX_STOPPED,
 };
 
-#define MAX_SCHEDULED_EVTS (4)
+/* CME 2026-11-05: was 4. Six event types are scheduled (RX backoff, TX command/beacon/mgmt/
+ * data, PS bus activity); with the table full a schedule was silently dropped (its
+ * MMOSAL_ASSERT is compiled out), stalling that path. One slot per type, plus spare. */
+#define MAX_SCHEDULED_EVTS (8)
 
 struct driver_data
 {
